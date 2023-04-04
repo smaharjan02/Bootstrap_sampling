@@ -1,9 +1,12 @@
+mod parser;
+use std::{fs::File, io::{BufReader, BufRead}};
 #[warn(unused_imports)]
-#[allow(dead_code)]
+use std::fs;
 use rusqlite::{Connection, Result};
 use rand::seq::IteratorRandom;
-use rand::prelude::SliceRandom;
-#[derive(Clone,Debug)]
+
+#[derive(Clone,Debug)]#[allow(dead_code)]
+
 struct Lineitem {
     l_orderkey: i32,
     l_partkey: i32,
@@ -86,15 +89,32 @@ fn query_result(sample:&Vec<Lineitem>, query: &str) -> f64 {
     result
 }
 
+fn is_column_in_file(column_name: &str, file_path: &str) -> Option<String> {
+    let contents = fs::read_to_string(file_path).expect("Failed to read file");
+
+    contents.lines().enumerate().find_map(|(_, line)| {
+        if line.contains(column_name) {
+            Some(column_name.to_string())
+        } else {
+            None
+        }
+    })
+}
+
+
 fn main(){
     let sample = create_sample("table100m.db", 0.1).unwrap();
 
     println!("Sample size: {:#?}", sample.len());
 
-    let simple_ground_truth = query_result(&sample, "l_quantity"); 
+    let file = File::open("query.sql"). expect("Unable to open file");
+    let reader = BufReader::new(file);
 
-    println!("Simple ground truth: {:#?}", simple_ground_truth);
-    
-    // println!("Simple ground truth: {:#?}", simple_ground_truth);
-    // println!("Database ground truth: {:#?}", database_ground_truth);
+    for (index,line) in reader.lines().enumerate() {
+        let line = line.unwrap();
+        let (_, statement) = parser::parse_select_statement(&line).unwrap();
+        println!("Line number {} \n {:#?}", index+1, statement);
 }
+}
+
+

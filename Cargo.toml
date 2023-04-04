@@ -7,9 +7,7 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8.5"
-sqlparser = "0.32.0"
-#sqlx = { version = "0.6.2", features = [  "runtime-tokio-native-tls", "sqlite" ] }
-#tokio = { version = "1.26.0", features = ["macros"]}
 chrono = {version = "0.4.23", features = ["serde"]}
-rusqlite = "0.28.0"
+rusqlite = "0.29.0"
 statrs = "0.16.0"
+nom = "7.1.0"
