@@ -1,7 +1,7 @@
+#[allow(dead_code)]
+
 mod parser;
 use std::{fs::File, io::{BufReader, BufRead}};
-#[warn(unused_imports)]
-use std::fs;
 use rusqlite::{Connection, Result};
 use rand::seq::IteratorRandom;
 
@@ -79,27 +79,27 @@ fn create_sample(db_file: &str, sample_fraction: f64) -> Result<Vec<Lineitem>, B
     Ok(sample)
 }
 
-fn query_result(sample:&Vec<Lineitem>, query: &str) -> f64 {
-    let mut result = 0.0;
-    for row in sample {
-        if query == "l_quantity" {
-            result += row.l_quantity;
-        }
-    }
-    result
-}
+// fn query_result(sample:&Vec<Lineitem>, query: &str) -> f64 {
+//     let mut result = 0.0;
+//     for row in sample {
+//         if query == "l_quantity" {
+//             result += row.l_quantity;
+//         }
+//     }
+//     result
+// }
 
-fn is_column_in_file(column_name: &str, file_path: &str) -> Option<String> {
-    let contents = fs::read_to_string(file_path).expect("Failed to read file");
+// fn is_column_in_file(column_name: &str, file_path: &str) -> Option<String> {
+//     let contents = fs::read_to_string(file_path).expect("Failed to read file");
 
-    contents.lines().enumerate().find_map(|(_, line)| {
-        if line.contains(column_name) {
-            Some(column_name.to_string())
-        } else {
-            None
-        }
-    })
-}
+//     contents.lines().enumerate().find_map(|(_, line)| {
+//         if line.contains(column_name) {
+//             Some(column_name.to_string())
+//         } else {
+//             None
+//         }
+//     })
+// }
 
 
 fn main(){
