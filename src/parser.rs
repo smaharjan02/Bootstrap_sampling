@@ -1,4 +1,4 @@
-
+#![allow(dead_code)]
 // Used libraries
 use nom::{
     branch::alt,
@@ -21,6 +21,46 @@ pub struct SelectStatement {
     and_cond_column: String,
     and_cond_comparator: String,
     and_cond_value: String,
+
+}
+
+impl SelectStatement {
+    pub fn function(&self) -> &str {
+        &self.function
+    }
+
+    pub fn table(&self) -> &str {
+        &self.table
+    }
+
+    pub fn alias(&self) -> &str {
+        &self.alias
+    }
+
+    pub fn where_cond_column(&self) -> &str {
+        &self.where_cond_column
+    }
+
+    pub fn where_cond_comparator(&self) -> &str {
+        &self.where_cond_comparator
+    }
+
+    pub fn where_cond_value(&self) -> &str {
+        &self.where_cond_value
+    }
+
+    pub fn and_cond_column(&self) -> &str {
+        &self.and_cond_column
+    }
+
+    pub fn and_cond_comparator(&self) -> &str {
+        &self.and_cond_comparator
+    }
+
+    pub fn and_cond_value(&self) -> &str {
+        &self.and_cond_value
+    }
+
 
 }
 

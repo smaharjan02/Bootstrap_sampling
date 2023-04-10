@@ -1,1 +1,1 @@
-select count(*) from lineitem ll where L_QUANTITY < 20 and L_QUANTITY > 0
+select count(*) from lineitem ll where L_EXTENDEDPRICE < 100000.00 and L_EXTENDEDPRICE > 20000.00

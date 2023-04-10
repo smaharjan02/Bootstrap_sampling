@@ -1,86 +1,18 @@
 #[allow(dead_code)]
-
+mod data_sampling;
 mod parser;
+mod bootstrap_sampling;
+
+use data_sampling::{create_sample, lineitem_to_hashmap,sample_ground_truth};
+use bootstrap_sampling::{bootstrap_sums, random_sample_with_replacement, calculate_mean,calculate_std_error};
+use parser::{SelectStatement, parse_select_statement};
 use regex::Regex;
-use std::collections::HashMap;
-use std::{fs::{File, self}, io::{BufReader, BufRead}};
-use rusqlite::{Connection, Result};
-use rand::seq::IteratorRandom;
+use std::{ fs, collections::HashMap};
 
-#[derive(Clone,Debug)]
-struct Lineitem {
-    l_orderkey: i32,
-    l_partkey: i32,
-    l_suppkey: i32,
-    l_linenumber: i32,
-    l_quantity: f64,
-    l_extendedprice: f64,
-    l_discount: f64,
-    l_tax: f64,
-    l_returnflag: String,
-    l_linestatus: String,
-    l_shipdate: String,
-    l_commitdate: String,
-    l_receiptdate: String,
-    l_shipinstruct: String,
-    l_shipmode: String,
-    l_comment: String,
-}
-
-impl Lineitem {
-    fn from_row(row: &rusqlite::Row) -> Result<Self> {
-        Ok(Lineitem {
-            l_orderkey: row.get(0)?,
-            l_partkey: row.get(1)?,
-            l_suppkey: row.get(2)?,
-            l_linenumber: row.get(3)?,
-            l_quantity: row.get(4)?,
-            l_extendedprice: row.get(5)?,
-            l_discount: row.get(6)?,
-            l_tax: row.get(7)?,
-            l_returnflag: row.get(8)?,
-            l_linestatus: row.get(9)?,
-            l_shipdate: row.get(10)?,
-            l_commitdate: row.get(11)?,
-            l_receiptdate: row.get(12)?,
-            l_shipinstruct: row.get(13)?,
-            l_shipmode: row.get(14)?,
-            l_comment: row.get(15)?,
-        })
-    }
-}
-
-fn create_sample(db_file: &str, sample_fraction: f64) -> Result<Vec<Lineitem>, Box<dyn std::error::Error>> {
-    // Open the SQLite database connection
-    let conn = Connection::open(db_file)?;
-
-    // Define the SQL query to retrieve all rows from the lineitem table
-    let query = "SELECT * FROM lineitem;";
-
-    // Execute the query and get all the rows
-    let mut stmt = conn.prepare(query)?;
-    let all_rows = stmt.query_map([], Lineitem::from_row)?.collect::<Result<Vec<Lineitem>, _>>()?;
+use crate::bootstrap_sampling::calculate_confidence_interval;
 
 
-    // Calculate the sample size
-    let sample_size = (all_rows.len() as f64 * sample_fraction).floor() as usize;
-
-    // Randomly select the sample without replacement
-    let mut rng = rand::thread_rng();
-    let sample = all_rows.iter().cloned().choose_multiple(&mut rng, sample_size);
-
-    // Close the database connection
-    drop(stmt);
-    drop(conn);
-
-    // // Calculate the ground truth of the sample and database
-    // let sample_ground_truth = sample.iter().map(|row| row.l_quantity).sum::<f64>();
-    // let database_ground_truth = all_rows.iter().map(|row| row.l_quantity).sum::<f64>();
-
-    Ok(sample)
-}
-
-
+//Getting all the column name from create table schema
 fn parse_column_names(sql: &str) -> Vec<String> {
     let column_re = Regex::new(r"(?i)(\w+)\s+[\w\(\),]+(\s+NOT NULL)?").unwrap();
     column_re
@@ -90,106 +22,118 @@ fn parse_column_names(sql: &str) -> Vec<String> {
         .collect()
 }
 
-//Creating a hashmap using column names as keys and lineitem struct values as values
-fn lineitem_to_hashmap(lineitems: &[Lineitem], column_names: &Vec<String>) -> Vec<HashMap<String, String>> {
-    let mut hashmaps = Vec::new();
-    
-    for lineitem in lineitems {
-        let mut hashmap = HashMap::new();
-        for column_name in column_names {
-            match column_name.to_lowercase().as_str() {
-                "l_orderkey" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_orderkey.to_string());
-                }
-                "l_partkey" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_partkey.to_string());
-                }
-                "l_suppkey" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_suppkey.to_string());
-                }
-                "l_linenumber" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_linenumber.to_string());
-                }
-                "l_quantity" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_quantity.to_string());
-                }
-                "l_extendedprice" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_extendedprice.to_string());
-                }
-                "l_discount" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_discount.to_string());
-                }
-                "l_tax" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_tax.to_string());
-                }
-                "l_returnflag" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_returnflag.to_string());
-                }
-                "l_linestatus" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_linestatus.to_string());
-                }
-                "l_shipdate" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_shipdate.to_string());
-                }
-                "l_commitdate" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_commitdate.to_string());
-                }
-                "l_receiptdate" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_receiptdate.to_string());
-                }
-                "l_shipinstruct" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_shipinstruct.to_string());
-                }
-                "l_shipmode" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_shipmode.to_string());
-                }
-                "l_comment" => {
-                    hashmap.insert(column_name.clone(), lineitem.l_comment.to_string());
-                }
-                _ => {
-                    println!("Not found");
-                }            
-            };
+/// This function takes in a vector of HashMaps and a SelectStatement and returns a vector of i64 which will be our sample query result Ys 
+fn get_query_result(data: &Vec<HashMap<String, String>>, select: &SelectStatement) -> Vec<HashMap<usize, i64>> {
+    let mut results: Vec<HashMap<usize, i64>> = Vec::new();
+    let mut counter: usize = 0;
+
+    for row in data {
+        //checking for the condtion in where clause
+        let mut where_cond_result = false;
+        let mut and_cond_result = false;
+
+        for (column_name, column_value) in row.iter() {
+            if column_name == &select.where_cond_column() && column_name == &select.and_cond_column() {
+                let column_value = column_value.parse::<f64>().unwrap_or(0.0); // parsing string as f64 so that it works on both int and float data types
+                let where_cond_value = select.where_cond_value().parse::<f64>().unwrap_or(0.0);
+                let and_cond_value = select.and_cond_value().parse::<f64>().unwrap_or(0.0);
+                //matching the comparator and returning true or false based on the condition values
+                where_cond_result = match select.where_cond_comparator() {
+                    "<" => column_value < where_cond_value,
+                    ">" => column_value > where_cond_value,
+                    _ => false,
+                };
+
+                and_cond_result = match select.and_cond_comparator() {
+                    "<" => column_value < and_cond_value,
+                    ">" => column_value > and_cond_value,
+                    _ => false,
+                };
+            }
         }
-        hashmaps.push(hashmap);
+
+        let mut result = HashMap::new();
+        //inserting 1 if the where condition and and condition are true else inserting 0
+        result.insert(counter, if where_cond_result && and_cond_result { 1 } else { 0 });
+        results.push(result);
+        counter += 1;
     }
-    hashmaps
+
+    results
 }
 
 
+
 fn main(){
-    let sample = create_sample("table100m.db", 0.1).unwrap();
+    //get the database file name and sample fraction from command line as arguments
+    let db_file = "table100m.db";
+    let sample_fraction = 0.1;
+
+    //parsing the select statement
+    let select = fs::read_to_string("query.txt")
+        .expect("Unable to read file");
+
+    let (_,select_statement) = parse_select_statement(select.as_str()).unwrap();
+
+    //creating the sample from the database
+    let (sample, database_ground_truth) = create_sample(db_file,select.as_str(), sample_fraction).unwrap();
+    println!("Sample size: {} ", sample.len());
+    //running the query directly on the database to get the ground truth
+    print!("Database ground truth: {} \n", database_ground_truth);
+
 
     //parsing the create table schema to get the column names
     let create_table_column = fs::read_to_string("create_table.txt")
         .expect("Unable to read file");
     let column_names = parse_column_names(&create_table_column);
 
-
+    
+    //converting the sample to a vector of HashMaps
     let hashed_table = lineitem_to_hashmap(&sample, &column_names);
 
-    println!("{:#?}", hashed_table.len());
-    // for hashmap in hashed_table {
-    //     println!("{:#?}", hashmap.len());
-    // }
+    //getting the sample query result 
+    let sample_query_result = get_query_result(&hashed_table, &select_statement);
 
-    
+    println!("Sample query result: {:#?}", sample_query_result.len());
+    //calculating the sample ground truth
+    let sample_ground_truth = sample_ground_truth(&sample_query_result, sample_fraction);
 
-    
-    // println!("Sample size: {:#?}", sample.len());
+    println!("Sample ground truth: {}", sample_ground_truth);
 
-    // let file = File::open("query.txt"). expect("Unable to open file");
-    // let reader = BufReader::new(file);
+    //number of bootstrap samples TODO: make this a command line argument
+    let bootstrap_size = 1000;
 
-    // for (index,line) in reader.lines().enumerate() {
-    //     let line = line.unwrap();
-    //     let (_, statement) = parser::parse_select_statement(&line).unwrap();
-    //     println!("Line number {} \n {:#?}", index+1, statement );
-    // }
+    let bootstrap_sampling = random_sample_with_replacement(&sample_query_result, sample_query_result.len());
+    println!("Bootstrap sampling: {:#?}", bootstrap_sampling.len());
 
-    
+    let (bootstrap_sums, elapsed_time) = bootstrap_sums(&bootstrap_sampling, bootstrap_size,sample_fraction);
+    println!("Bootstrap sums: {:#?}", bootstrap_sums.len());
+    println!("Time taken: {:#?} seconds", elapsed_time);
+
+    let bootstrap_mean =  calculate_mean(&bootstrap_sums);
+    println!("Bootstrap mean: {}", bootstrap_mean);
+
+    let bootstrap_std = calculate_std_error(&bootstrap_sums, bootstrap_mean);
+    println!("Bootstrap std: {:.2}", bootstrap_std);
+
+    //z_scvore for 95% confidence interval
+    let z = 1.960;
+    let (lower_bound, upper_bound) = calculate_confidence_interval(bootstrap_std, z) ;
+
+    println!("Confidence interval: [{:.2}, {:.2}]", lower_bound, upper_bound);
+
+    let lower_range = sample_ground_truth as f64 - lower_bound;
+    let upper_range = sample_ground_truth as f64 + upper_bound;
+
+    println!("Lower range: {:.2} and Upper range {:.2}", lower_range,upper_range);
+
+    if (database_ground_truth as f64) > lower_range && (database_ground_truth as f64) < upper_range {
+        println!("The database ground truth {} is within the Lower range {:.2} and Upper range {:.2}", database_ground_truth, lower_range, upper_range);
+    } else {
+        println!("The database ground truth is not within the confidence interval");
+    }
+
 }
-
 
 
 
