@@ -149,12 +149,20 @@ pub fn lineitem_to_hashmap(lineitems: &[Lineitem], column_names: &Vec<String>) -
 }
 
 //function to calculate the sample ground truth
-pub fn sample_ground_truth(query_result: &Vec<HashMap<usize,i64>>, sample_size: f64) -> i64 {
-    let mut sum: i64 = 0;
-    //summing up all the values in the query result
-    for hashmap in query_result {
-        sum += hashmap.values().sum::<i64>();
-    }
+// pub fn sample_ground_truth(query_result: &Vec<HashMap<usize,i64>>, sample_size: f64) -> i64 {
+//     let mut sum: i64 = 0;
+//     //summing up all the values in the query result
+//     for hashmap in query_result {
+//         sum += hashmap.values().sum::<i64>();
+//     }
+
+//     //calculating the sample ground truth by dividing the sum by the sample size
+//     let y = sum as f64 / sample_size;
+//     y as i64
+// }
+
+pub fn sample_ground_truth(query_result: &Vec<i64>, sample_size: f64) -> i64 {
+    let sum: i64 = query_result.iter().sum::<i64>() as i64;
 
     //calculating the sample ground truth by dividing the sum by the sample size
     let y = sum as f64 / sample_size;

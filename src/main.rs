@@ -7,7 +7,8 @@ use data_sampling::{create_sample, lineitem_to_hashmap,sample_ground_truth};
 use bootstrap_sampling::{bootstrap_sums, random_sample_with_replacement,calculate_confidence_interval, calculate_mean,calculate_std_error};
 use parser::{SelectStatement, parse_select_statement};
 use regex::Regex;
-use std::{ fs, collections::HashMap};
+use std::{ fs, collections::HashMap, env};
+
 
 
 
@@ -21,10 +22,9 @@ fn parse_column_names(sql: &str) -> Vec<String> {
         .collect()
 }
 
-/// This function takes in a vector of HashMaps and a SelectStatement and returns a vector of i64 which will be our sample query result Ys 
-fn get_query_result(data: &Vec<HashMap<String, String>>, select: &SelectStatement) -> Vec<HashMap<usize, i64>> {
-    let mut results: Vec<HashMap<usize, i64>> = Vec::new();
-    let mut counter: usize = 0;
+//checking against the where condition and and condition and returning the result as 1 and 0
+fn get_query_result(data: &Vec<HashMap<String, String>>, select: &SelectStatement) -> Vec<i64> {
+    let mut results = Vec::with_capacity(data.len());
 
     for row in data {
         //checking for the condtion in where clause
@@ -51,22 +51,28 @@ fn get_query_result(data: &Vec<HashMap<String, String>>, select: &SelectStatemen
             }
         }
 
-        let mut result = HashMap::new();
         //inserting 1 if the where condition and and condition are true else inserting 0
-        result.insert(counter, if where_cond_result && and_cond_result { 1 } else { 0 });
+        let result = if where_cond_result && and_cond_result { 1 } else { 0 };
         results.push(result);
-        counter += 1;
     }
 
     results
 }
 
 
-
 fn main(){
     //get the database file name and sample fraction from command line as arguments and 
-    let db_file = "table100k.db";
-    let sample_fraction = 0.1;
+    
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 4 {
+        eprintln!("Usage: {} -d <database> -s <sample_fraction>", args[0]);
+        std::process::exit(1);
+    }
+
+    let db_file = args.iter().position(|arg| arg == "-d").map(|i| &args[i + 1]).expect("Missing -d <database> argument");
+    let sample_fraction = args.iter().position(|arg| arg == "-s").map(|i| &args[i + 1]).expect("Missing -s <sample_fraction> argument");
+    let sample_fraction = sample_fraction.parse::<f64>().expect("Sample fraction must be a valid floating-point number");
 
     //parsing the select statement
     let select = fs::read_to_string("query.txt")
@@ -99,37 +105,35 @@ fn main(){
 
     println!("Sample ground truth: {}", sample_ground_truth);
 
-    //number of bootstrap samples TODO: make this a command line argument
+    //Bootstrap sampling and error estimations
+    let z = 1.960;
     let bootstrap_size = 1000;
-    let bootstrap_sampling = random_sample_with_replacement(&sample_query_result, sample_query_result.len());
-    println!("Bootstrap sampling: {:#?}", bootstrap_sampling.len());
 
-    let (bootstrap_sums, elapsed_time) = bootstrap_sums(&bootstrap_sampling, bootstrap_size,sample_fraction);
-    println!("Bootstrap sums: {:#?}", bootstrap_sums.len());
+    //bootstrap sampling takes in the sample query result, bootstrap size and sample fraction
+    let (bootstrap_sampling,elapsed_time) = bootstrap_sums(&sample_query_result, bootstrap_size,sample_fraction);
+    println!("Bootstrap sampling: {:#?}", bootstrap_sampling.len());
     println!("Time taken: {:#?} seconds", elapsed_time);
 
-    //calculating the bootstrap mean and std error 
-    let bootstrap_mean =  calculate_mean(&bootstrap_sums);
-    //println!("Bootstrap mean: {}", bootstrap_mean);
-    let bootstrap_std = calculate_std_error(&bootstrap_sums, bootstrap_mean);
-    println!("Bootstrap std: {:.2}", bootstrap_std);
+    let bootstrap_mean = calculate_mean(&bootstrap_sampling);
+    println!("Bootstrap mean: {:#?}", bootstrap_mean);
 
-    //z_score for 95% confidence interval
-    let z = 1.960;
-    let (lower_bound, upper_bound) = calculate_confidence_interval(bootstrap_std, z) ;
-    println!("Confidence interval: [{:.2}, {:.2}]", lower_bound, upper_bound);
-    //calculating the lower_bound and upper_bound
+    let bootstrap_std_error = calculate_std_error(&bootstrap_sampling,bootstrap_mean);
+    println!("Bootstrap standard error: {:#?}", bootstrap_std_error);
+
+    let (lower_bound, upper_bound) = calculate_confidence_interval(bootstrap_std_error,z);
+    println!("Confidence interval: [{:#?}, {:#?}]", lower_bound, upper_bound);
+
     let lower_range = sample_ground_truth as f64 - lower_bound;
     let upper_range = sample_ground_truth as f64 + upper_bound;
 
-    println!("Lower range: {:.2} and Upper range {:.2}", lower_range,upper_range);
+    println!("Lower range: [{:.2}, Upper range {:.2}]", lower_range, upper_range);
 
-    //checking if the database ground truth is within the lower and upper range 
     if (database_ground_truth as f64) > lower_range && (database_ground_truth as f64) < upper_range {
-        println!("The database ground truth {} is within the Lower range {:.2} and Upper range {:.2}", database_ground_truth, lower_range, upper_range);
+        println!("The database ground truth {} is within the confidence interval[{:.2} ,{:.2}]", database_ground_truth, lower_range, upper_range);
     } else {
-        println!("The database ground truth {} is NOT!! within the Lower range {:.2} and Upper range {:.2}", database_ground_truth, lower_range, upper_range);
+        println!("The database ground truth is not within the confidence interval");
     }
+
 
 }
 

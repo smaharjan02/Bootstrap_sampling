@@ -1,23 +1,22 @@
 use rand::seq:: SliceRandom;
-use std::{collections::HashMap, time::Instant};
+use std::{time::Instant};
 
 
 //generating bootstrapping sample using simple random sampling with replacement
-pub fn random_sample_with_replacement(sample_query_result: &[HashMap<usize, i64>], size: usize) -> Vec<HashMap<usize, i64>> {
+pub fn random_sample_with_replacement(sample: &Vec<i64>, size: usize) -> Vec<i64> {
     let mut rng = rand::thread_rng();
-    let mut sample = Vec::with_capacity(size);
+    let mut resampled = Vec::with_capacity(size);
 
     for _ in 0..size {
-        let item = sample_query_result.choose(&mut rng).unwrap().clone();
-        sample.push(item);
+        let item = sample.choose(&mut rng).unwrap().clone();
+        resampled.push(item);
     }
 
-    sample
+    resampled
 }
 
-//generating bootstrapping groundtuth sample using simple random sampling with replacement and 
-//can improve the speed by using parallelism and good hardware
-pub fn bootstrap_sums(data: &[HashMap<usize, i64>], num_resamples: usize, sample_fraction:f64) -> (Vec<i64>,f64) {
+//generating bootstrapping sample groundtuth using simple random sampling with replacement 
+pub fn bootstrap_sums(data: &Vec<i64>, num_resamples: usize, sample_fraction: f64) -> (Vec<i64>, f64) {
     let mut bootstrap_sums = Vec::with_capacity(num_resamples);
 
     // Start the timer
@@ -25,14 +24,14 @@ pub fn bootstrap_sums(data: &[HashMap<usize, i64>], num_resamples: usize, sample
 
     for _ in 0..num_resamples {
         let resampled_data = random_sample_with_replacement(&data, data.len());
-        let sum: i64 = resampled_data.iter().map(|hashmap| hashmap.values().sum::<i64>()).sum();
-        bootstrap_sums.push((sum as f64 /sample_fraction) as i64);
+        let sum: i64 = resampled_data.iter().sum();
+        bootstrap_sums.push((sum as f64 / sample_fraction) as i64);
     }
 
     // Calculate the elapsed time
     let elapsed_time = start_time.elapsed().as_secs_f64();
 
-    (bootstrap_sums,elapsed_time)
+    (bootstrap_sums, elapsed_time)
 }
 
 
