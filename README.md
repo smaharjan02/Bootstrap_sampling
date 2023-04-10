@@ -2,12 +2,17 @@
 Implementation of bootstrap sampling method for select query error estimations
 
 # To run the program
-got into src code folder and
--d database name
--s sample_size 
-cargo run -- -d table100k.db -s 0.1
+go into src code folder and
 
-#setting up database. 
+cargo run -- -d table100k.db -s 0.1 
+
+-d database name
+
+-s sample_size 
+
+# Setting up database. 
 go into src folder
-on the commmand line 
+
+on the command line 
+
 sqlite3 tablename< data_imoort.sql
