@@ -17,5 +17,6 @@ L_SHIPMODE CHAR(10) NOT NULL,
 L_COMMENT VARCHAR(44) NOT NULL,
 PRIMARY KEY (L_ORDERKEY, L_LINENUMBER));
 
-.mode "TABLE"
-.import '../TPC-H-Skew/data_100m/lineitem.tbl' lineitem
+.mode tabs
+.separator '|'
+.import 'data_100k/lineitem.tbl' lineitem

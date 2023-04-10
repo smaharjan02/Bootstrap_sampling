@@ -24,6 +24,7 @@ pub struct SelectStatement {
 
 }
 
+//implementing the getter methods for the struct
 impl SelectStatement {
     pub fn function(&self) -> &str {
         &self.function

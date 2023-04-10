@@ -3,12 +3,12 @@ use std::{collections::HashMap, time::Instant};
 
 
 //generating bootstrapping sample using simple random sampling with replacement
-pub fn random_sample_with_replacement(data: &[HashMap<usize, i64>], size: usize) -> Vec<HashMap<usize, i64>> {
+pub fn random_sample_with_replacement(sample_query_result: &[HashMap<usize, i64>], size: usize) -> Vec<HashMap<usize, i64>> {
     let mut rng = rand::thread_rng();
     let mut sample = Vec::with_capacity(size);
 
     for _ in 0..size {
-        let item = data.choose(&mut rng).unwrap().clone();
+        let item = sample_query_result.choose(&mut rng).unwrap().clone();
         sample.push(item);
     }
 
@@ -43,9 +43,9 @@ pub fn calculate_mean(bootstrap_sums: &[i64]) -> f64 {
 }
 
 //calculating standard deviation of bootstrapping ground truth sample
-pub fn calculate_std_error(numbers: &Vec<i64>, mean: f64) -> f64 {
-    let count = numbers.len() as f64;
-    let variance: f64 = numbers
+pub fn calculate_std_error(bootstrap_sums: &[i64], mean: f64) -> f64 {
+    let count = bootstrap_sums.len() as f64;
+    let variance: f64 = bootstrap_sums
         .iter()
         .map(|&value| {
             let diff = value as f64 - mean;
