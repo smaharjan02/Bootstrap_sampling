@@ -5,4 +5,6 @@ This project tries Calculate Selection Query estimation errors.
 got into src code and run cargo run on terminal
 
 #setting up database. 
-TODO()
+go into src
+on the commmand line 
+sqlite3 tablename< data_imoort.sql
